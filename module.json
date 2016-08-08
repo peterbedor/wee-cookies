@@ -1,0 +1,19 @@
+{
+	"name": "Wee Cookies",
+	"version": "1.0.0",
+	"description": "Simple module to manipulate browser cookies",
+	"homepage": "",
+	"author": "",
+	"autoload": true,
+	"extension": false,
+	"data": {},
+	"style": {
+		"build": []
+	},
+	"script": {
+		"build": []
+	},
+	"dependencies": {
+		"wee": "^3.0.0"
+	}
+}
