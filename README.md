@@ -8,7 +8,7 @@ This module makes manipulating browser cookies easier
 |--------------|---------|---------|------------------------------------------------------|
 | name         | string  |         | Sets the name of the cookie                          |
 | value        | mixed   |         | Sets the value of the cookie                         |
-| daysToExpire | integer | 7       | Sets the number of days the cookie will expire after |
+| daysToExpire | integer | 7       | Sets the number of days after which the cookie will expire |
 
 ## Getting Started
 
