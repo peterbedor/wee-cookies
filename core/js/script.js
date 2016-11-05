@@ -1,30 +1,59 @@
 Wee.fn.make('cookie', {
 	/**
+	 * Set a cookie
 	 *
 	 * @param conf - Configuration
 	 * @param conf.name - Cookie name
 	 * @param conf.value - Cookie value
-	 * @param conf.daysToExpire - Number of days to set cookie expiration
+	 * @param [conf.daysToExpire] - Number of days to set cookie expiration
 	 */
-	set: function(conf) {
-		var options = $.extend({
-				daysToExpire: 7
-			}, conf),
-			date = new Date();
-
-		date.setTime(date.getTime() + (options.daysToExpire * 24 * 60 * 60 * 1000));
-
-		document.cookie = options.name + '=' + options.value + '; ' + 'expires=' + date.toUTCString();
+	set: function(options) {
+		this.$private.set(options);
 	},
 
 	/**
-	 * Get cookie
-	 * @param {string} name - Cookie name
-	 * @returns {string|boolean} - Returns cookie value if found
+	 * Get a cookie by key
+	 *
+	 * @param key
+	 * @return {*} - Returns cookie value
 	 */
-	get: function(name) {
+	get: function(key) {
+		return this.$private.get(key);
+	},
+
+	/**
+	 * Delete a cookie by key
+	 *
+	 * @param key
+	 * @return {*} - Returns cookie value
+	 */
+	delete: function(key) {
+		this.$private.delete(key);
+	}
+}, {
+	/**
+	 * Set a cookie
+	 *
+	 * @param conf - Configuration
+	 * @param conf.name - Cookie name
+	 * @param conf.value - Cookie value
+	 * @param [conf.daysToExpire] - Number of days to set cookie expiration
+	 */
+	set: function(options) {
+		this.options = options;
+
+		$._doc.cookie = this.buildCookie()
+	},
+
+	/**
+	 * Get a cookie by key
+	 *
+	 * @param key
+	 * @return {*} - Returns cookie value
+	 */
+	get: function(key) {
 		var value = '; ' + document.cookie,
-			parts = value.split('; ' + name + '=');
+			parts = value.split('; ' + key + '=');
 
 		if (parts.length === 2) {
 			return parts.pop()
@@ -36,12 +65,39 @@ Wee.fn.make('cookie', {
 	},
 
 	/**
-	 * Delete cookie
-	 * @param {string} name - Name of cookie to delete
+	 * Get date for cookie
+	 *
+	 * @return {Date} - Date object
 	 */
-	destroy: function(name) {
+	getDate: function() {
+		var date = new Date(),
+			day = 24 * 60 * 60 * 1000;
+
+		return date.setTime(date.getTime() + (this.options.daysToExpire * day));
+	},
+
+	/**
+	 * Build the cookie string
+	 *
+	 * @return {string}
+	 */
+	buildCookie: function() {
+		var date = this.getDate();
+
+		return this.options.name + '=' +
+			this.options.value + '; ' +
+			'expires=' + date.toUTCString();
+	},
+
+	/**
+	 * Delete a cookie by key
+	 *
+	 * @param key
+	 * @return {*} - Returns cookie value
+	 */
+	delete: function(key) {
 		this.set({
-			name: name,
+			name: key,
 			value: '',
 			daysToExpire: -1
 		});
