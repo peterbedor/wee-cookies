@@ -1,105 +1,190 @@
 Wee.fn.make('cookie', {
+
 	/**
 	 * Set a cookie
 	 *
-	 * @param conf - Configuration
-	 * @param conf.name - Cookie name
-	 * @param conf.value - Cookie value
-	 * @param [conf.daysToExpire] - Number of days to set cookie expiration
+	 * @param {string} key
+	 * @param {string} value
+	 * @param {object} options
+	 * @param {int} [options.daysToExpire] - number of days for cookie to expire
+	 * @param {string} [options.path] - set path for the cookie
+	 * @param {string} [options.domain] - set the domain for the cookie
+	 * @param {boolean} [options.secure] - set a secure cookie
 	 */
-	set: function(options) {
-		this.$private.set(options);
+	set: function(key, value, options) {
+		options = $.extend({
+			daysToExpire: 7,
+			path: '/',
+			domain: '',
+			secure: false
+		});
+
+		this.$private.set(key, value, options);
 	},
 
 	/**
-	 * Get a cookie by key
+	 * Get a cookie
 	 *
-	 * @param key
-	 * @return {*} - Returns cookie value
+	 * @param {string} key
+	 * @param {boolean} [json] - boolean to parse for JSON
+	 * @returns {*}
 	 */
-	get: function(key) {
-		return this.$private.get(key);
+	get: function(key, json) {
+		return this.$private.get(key, json);
 	},
 
 	/**
-	 * Delete a cookie by key
+	 * Manually expire a cookie
 	 *
-	 * @param key
-	 * @return {*} - Returns cookie value
+	 * @param {string} key
 	 */
-	delete: function(key) {
-		this.$private.delete(key);
+	expire: function(key) {
+		this.$private.expire(key);
 	}
 }, {
-	/**
-	 * Set a cookie
-	 *
-	 * @param conf - Configuration
-	 * @param conf.name - Cookie name
-	 * @param conf.value - Cookie value
-	 * @param [conf.daysToExpire] - Number of days to set cookie expiration
-	 */
-	set: function(options) {
-		this.options = options;
+	_construct: function() {
+		this.cookieCachePrefix = 'cookie.';
 
-		$._doc.cookie = this.buildCookie()
+		this.cache = this.getCookieCache();
 	},
 
-	/**
-	 * Get a cookie by key
-	 *
-	 * @param key
-	 * @return {*} - Returns cookie value
-	 */
-	get: function(key) {
-		var value = '; ' + document.cookie,
-			parts = value.split('; ' + key + '=');
+	set: function(key, value, options) {
+		$._doc.cookie = this.generateCookieString(key, value, options);
+	},
 
-		if (parts.length === 2) {
-			return parts.pop()
-				.split(';')
-				.shift();
+	get: function(key, json) {
+		if (this.cachedDocumentCookie !== $._doc.cookie) {
+			this.refreshCookieCache();
 		}
 
-		return false;
+		var value = this.cache[this.cookieCachePrefix + key];
+
+		if (value === undefined) {
+			return undefined;
+		} else {
+			value = decodeURIComponent(value);
+
+			if (json) {
+				try {
+					value = JSON.parse(value);
+				} catch (e) {}
+			}
+
+			return value;
+		}
 	},
 
-	/**
-	 * Get date for cookie
-	 *
-	 * @return {Date} - Date object
-	 */
-	getDate: function() {
-		var date = new Date(),
-			day = 24 * 60 * 60 * 1000;
-
-		return date.setTime(date.getTime() + (this.options.daysToExpire * day));
-	},
-
-	/**
-	 * Build the cookie string
-	 *
-	 * @return {string}
-	 */
-	buildCookie: function() {
-		var date = this.getDate();
-
-		return this.options.name + '=' +
-			this.options.value + '; ' +
-			'expires=' + date.toUTCString();
-	},
-
-	/**
-	 * Delete a cookie by key
-	 *
-	 * @param key
-	 * @return {*} - Returns cookie value
-	 */
-	delete: function(key) {
-		this.set({
-			name: key,
-			value: '',
+	expire: function(key) {
+		this.set(key, false, {
 			daysToExpire: -1
 		});
+	},
+
+	/**
+	 * Generates a valid cookie string
+	 *
+	 * @param key
+	 * @param {*} value
+	 * @param {object} [options] - options object
+	 * @param {int} [options.daysToExpire] - number of days for cookie to expire
+	 * @param {string} [options.path] - set path for the cookie
+	 * @param {string} [options.domain] - set the domain for the cookie
+	 * @param {boolean} [options.secure] - set a secure cookie
+	 * @returns {string|*}
+	 */
+	generateCookieString: function(key, value, options) {
+		var expires = this.getExpireDate(options),
+			cookie;
+
+		try {
+			value = JSON.stringify(value);
+		} catch (e) {}
+
+		key = key.replace(/[^#$&+\^`|]/g, encodeURIComponent);
+		key = key.replace(/\(/g, '%28').replace(/\)/g, '%29');
+		value = (value + '').replace(/[^!#$&-+\--:<-\[\]-~]/g, encodeURIComponent);
+
+		cookie = key + '=' + value;
+		cookie += options.path ? ';path=' + options.path : '';
+		cookie += options.domain ? ';domain=' + options.domain : '';
+		cookie += options.expires ? ';expires=' + expires : '';
+		cookie += options.secure ? ';secure' : '';
+
+		return cookie;
+	},
+
+	/**
+	 * Manually refresh cookie cache
+	 */
+	refreshCookieCache: function() {
+		this.cache = this.getCookieCache();
+
+		this.cachedDocumentCookie = $._doc.cookie;
+	},
+
+	/**
+	 * Retrieve cookie cache
+	 *
+	 * @returns {{}}
+	 */
+	getCookieCache: function() {
+		var prefix = this.cookieCachePrefix,
+			cookies = $._doc.cookie ? $._doc.cookie.split('; ') : [],
+			cache = {},
+			i = 0;
+
+		for (; i < cookies.length; i++) {
+			var cookie = this.getKeyValuePair(cookies[i]);
+
+			if (cache[prefix + cookie.key] === undefined) {
+				cache[prefix + cookie.key] = cookie.value;
+			}
+		}
+
+		return cache;
+	},
+
+	/**
+	 * Parse a cookie string to get it's key value pair as an object
+	 *
+	 * @param cookieString
+	 * @returns {{key: *, value: string}}
+	 */
+	getKeyValuePair: function(cookieString) {
+		var index = cookieString.indexOf('='),
+			key,
+			decodedKey;
+
+		index = index < 0 ? cookieString.length : index;
+
+		key = cookieString.substr(0, index);
+
+		try {
+			decodedKey = decodeURIComponent(key);
+		} catch (e) {
+			console.error('Could not decode cookie with key "' + key + '"', e);
+		}
+
+		return {
+			key: decodedKey,
+			value: cookieString.substr(index + 1)
+		};
+	},
+
+	/**
+	 * Generate valid expiration date for cookie
+	 *
+	 * @param {int} [options.daysToExpire] - number of days for cookie to expire
+	 * @param options
+	 * @returns {string}
+	 */
+	getExpireDate: function(options) {
+		var expires = new Date();
+
+		expires.setMilliseconds(
+			expires.getMilliseconds() + options.daysToExpire * 864e+5
+		);
+
+		return expires.toUTCString();
 	}
 });
